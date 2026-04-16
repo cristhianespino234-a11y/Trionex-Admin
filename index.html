@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trionex Admin - Sistema Central v8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+<style>
+/* TEMA CLARO */
+:root {
+  --bg-color: #f4f7f6;
+  --sidebar-bg: #0a192f;
+  --sidebar-text: #e2e8f0;
+  --sidebar-hover: #172a45;
+  --card-bg: #ffffff;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  --border-color: #e5e7eb;
+  --accent-color: #1d4ed8;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+}
+
+/* TEMA OSCURO */
+body.dark-mode {
+  --bg-color: #0d1117;
+  --sidebar-bg: #010409;
+  --sidebar-text: #a7f3d0;
+  --sidebar-hover: #161b22;
+  --card-bg: #161b22;
+  --text-main: #f0f6fc;
+  --text-muted: #8b949e;
+  --border-color: #30363d;
+  --accent-color: #4ade80;
+  --success: #34d399;
+  --danger: #f87171;
+  --warning: #fbbf24;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+body { background-color: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; transition: background-color 0.3s ease; }
+
+/* PANTALLA DE LOGIN */
+#login-screen { position: fixed; inset: 0; background-color: var(--sidebar-bg); display: flex; align-items: center; justify-content: center; z-index: 9999; color: white; flex-direction: column; }
+.login-box { background: var(--card-bg); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; color: var(--text-main); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+.login-box h2 { margin-bottom: 8px; font-weight: 700; }
+.login-box p { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+.login-input { width: 100%; padding: 14px; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 16px; font-size: 16px; background: var(--bg-color); color: var(--text-main); }
+.login-input:focus { outline: none; border-color: var(--accent-color); }
+#login-error { color: var(--danger); font-size: 12px; margin-bottom: 16px; display: none; }
+
+/* ESTRUCTURA PRINCIPAL */
+#app-container { display: none; width: 100%; height: 100%; }
+
+/* SIDEBAR */
+.sidebar { width: 260px; background-color: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; transition: all 0.3s ease; flex-shrink: 0; }
+.logo-area { padding: 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.logo-area h1 { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+.logo-area span { font-size: 10px; color: var(--accent-color); text-transform: uppercase; letter-spacing: 2px; }
+.nav-menu { flex: 1; padding: 20px 0; overflow-y: auto; }
+.nav-item { padding: 14px 24px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: 0.2s; font-size: 14px; font-weight: 500; }
+.nav-item:hover, .nav-item.active { background-color: var(--sidebar-hover); color: var(--accent-color); border-left: 4px solid var(--accent-color); }
+.nav-item.active { background-color: rgba(29, 78, 216, 0.1); }
+body.dark-mode .nav-item.active { background-color: rgba(74, 222, 128, 0.1); }
+
+/* MAIN CONTENT */
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.topbar { height: 70px; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; transition: all 0.3s ease; }
+.page-title { font-size: 20px; font-weight: 600; }
+.topbar-actions { display: flex; align-items: center; gap: 16px; position: relative; }
+
+/* PERFIL Y BOTONES */
+.profile-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; border: 2px solid transparent; overflow: hidden; }
+.profile-btn img { width: 100%; height: 100%; object-fit: cover; }
+.profile-btn:hover { border-color: var(--text-main); }
+.profile-menu { display: none; position: absolute; top: 50px; right: 0; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; width: 220px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 100; }
+.profile-menu.open { display: block; }
+.theme-switch { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+.theme-switch:hover { border-color: var(--accent-color); color: var(--accent-color); }
+.btn-export { background: var(--success); border: 1px solid var(--success); color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
+.btn-export:hover { opacity: 0.9; }
+
+.content-area { padding: 32px; overflow-y: auto; flex: 1; }
+
+/* COMPONENTES */
+.card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); transition: all 0.3s ease; }
+.card-header { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+
+/* GRID KPIS */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 24px; }
+.kpi-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; color: var(--text-main); transition: color 0.3s ease; }
+.kpi-sub { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-warning { color: var(--warning); }
+.text-info { color: var(--accent-color); }
+
+/* FORMS & TABLES */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
+.form-control { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-color); color: var(--text-main); font-size: 14px; transition: border 0.2s; }
+.form-control:focus { outline: none; border-color: var(--accent-color); }
+.form-control:disabled { opacity: 0.7; cursor: not-allowed; }
+.btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-primary { background-color: var(--accent-color); color: #fff; }
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-secondary { background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); }
+.btn-success { background-color: var(--success); color: #fff; }
+.btn-warning { background-color: var(--warning); color: #fff; }
+.btn-danger { background-color: var(--danger); color: #fff; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+tr:hover td { background-color: rgba(0,0,0,0.02); }
+body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
+
+.view { display: none; animation: fadeIn 0.3s ease; }
+.view.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; display: inline-block; }
+.badge-blue { background: rgba(29, 78, 216, 0.1); color: var(--accent-color); }
+.badge-green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+.badge-yellow { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+.badge-red { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+/* MODALES */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.active { display: flex; animation: fadeIn 0.2s ease; }
+.modal-content { background: var(--card-bg); padding: 32px; border-radius: 12px; width: 100%; max-width: 450px; border: 1px solid var(--border-color); }
+.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--text-main); }
+</style>
+</head>
+<body>
+
+  <div id="login-screen">
+    <div style="font-size: 48px; margin-bottom: 16px;">🔐</div>
+    <div class="login-box">
+      <h2>Acceso Administrativo</h2>
+      <p>Ingresa tu credencial para continuar</p>
+      <input type="password" id="admin-pass" class="login-input" placeholder="Contraseña Maestra">
+      <div id="login-error">Contraseña incorrecta</div>
+      <button class="btn btn-primary" style="width: 100%;" onclick="verificarLogin()">Ingresar</button>
+      <p style="margin-top:20px; font-size:11px; margin-bottom:0;">La contraseña por defecto es <strong>admin123</strong> (puedes cambiarla en tu perfil)</p>
+    </div>
+  </div>
+
+  <div id="app-container">
+    <aside class="sidebar">
+      <div class="logo-area">
+        <div style="font-size: 28px;">📊</div>
+        <div>
+          <h1>TRIONEX</h1>
+          <span>Admin Pro</span>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <div class="nav-item active" onclick="switchView('dashboard', this)">📈 Dashboard Financiero</div>
+        <div class="nav-item" onclick="switchView('pnl', this)">📑 Estado de Resultados</div>
+        <div class="nav-item" onclick="switchView('caja', this)">💰 Control de Caja</div>
+        <div class="nav-item" onclick="switchView('inventario', this)">📦 Inventario Global</div>
+        <div class="nav-item" onclick="switchView('analisis', this)">🧠 Análisis Inteligente</div>
+        <div class="nav-item" onclick="switchView('logistica', this)">🚢 Logística y Tracking</div>
+        <div class="nav-item" onclick="switchView('bancos', this)">🏦 Bancos y Deudas</div>
+        <div class="nav-item" onclick="switchView('socios', this)">🤝 Patrimonio (Dueño)</div>
+        <div class="nav-item" onclick="switchView('supabase', this)">☁️ Conexión Supabase</div>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="page-title" id="topbar-title">Dashboard Financiero</div>
+        <div class="topbar-actions">
+          <button class="btn-export" onclick="exportarExcel()">📥 Exportar Excel</button>
+          <button class="theme-switch" onclick="toggleTheme()" id="btn-theme">🌙 Modo Noche</button>
+          
+          <div class="profile-btn" onclick="toggleProfileMenu()" id="user-avatar-display">C</div>
+          
+          <div class="profile-menu" id="profile-menu">
+            <h4 style="margin-bottom: 12px; font-size: 14px;">Perfil Empresa</h4>
+            <div style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Subir foto de la empresa:</div>
+            <input type="file" id="company-photo" accept="image/*" style="display:none" onchange="uploadCompanyPhoto(event)">
+            <button class="btn btn-secondary" style="width:100%; padding:8px; font-size:12px; margin-bottom: 12px;" onclick="document.getElementById('company-photo').click()">📷 Seleccionar Foto</button>
+            <button class="btn btn-secondary" style="width:100%; padding:8px; font-size:12px; margin-bottom: 12px;" onclick="abrirModal('modal-cambiar-pass')">🔐 Cambiar Contraseña</button>
+            <hr style="border:none; border-top:1px solid var(--border-color); margin-bottom:12px;">
+            <button class="btn" style="width:100%; background:var(--danger); color:white; padding:8px; font-size:12px;" onclick="cerrarSesion()">🚪 Bloquear Sistema</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="content-area">
+
+        <div id="view-dashboard" class="view active">
+          <div class="kpi-grid">
+            <div class="card" style="margin-bottom:0">
+              <div class="card-header">Ventas del Mes</div>
+              <div class="kpi-value" id="dash-ventas">S/ 0.00</div>
+              <div class="kpi-sub text-success">Total transacciones completadas</div>
+            </div>
+            <div class="card" style="margin-bottom:0">
+              <div class="card-header">Utilidad Bruta</div>
+              <div class="kpi-value" id="dash-bruta">S/ 0.00</div>
+              <div class="kpi-sub" id="dash-margen">Margen: 0%</div>
+            </div>
+            <div class="card" style="margin-bottom:0">
+              <div class="card-header">Utilidad Neta</div>
+              <div class="kpi-value text-success" id="dash-neta">S/ 0.00</div>
+              <div class="kpi-sub">Después de gastos operativos</div>
+            </div>
+            <div class="card" style="margin-bottom:0">
+              <div class="card-header">Salud / Punto Equilibrio</div>
+              <div class="kpi-value text-success" id="eq-status">Analizando...</div>
+              <div class="kpi-sub" id="eq-sub">Cubiertos fijos de S/ 2,400</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+            <div class="card">
+              <div class="card-header">Evolución de Ingresos vs Egresos</div>
+              <canvas id="mainChart" height="100"></canvas>
+            </div>
+            <div class="card">
+              <div class="card-header">Composición de Gastos</div>
+              <canvas id="pieChart" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-pnl" class="view">
+          <div class="card">
+            <div class="card-header">
+              Estado de Resultados (P&L)
+              <button class="btn btn-secondary btn-sm" onclick="generarPnL()">🔄 Actualizar Reporte</button>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:24px;">Reporte financiero formal del mes en curso estructurado para análisis contable.</p>
+            
+            <table style="width: 100%; border: 1px solid var(--border-color);">
+              <tbody>
+                <tr style="background: rgba(29, 78, 216, 0.05); font-weight: 700; font-size: 15px;">
+                  <td style="padding: 16px;">(+) Ingresos Brutos por Ventas</td>
+                  <td id="pnl-ventas" style="text-align: right; padding: 16px; color: var(--accent-color);">S/ 0.00</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px 12px 32px; color: var(--text-muted);">(-) Costo de la Mercadería Vendida (CMV)</td>
+                  <td id="pnl-cmv" style="text-align: right; padding: 12px 16px; color: var(--danger);">S/ 0.00</td>
+                </tr>
+                <tr style="border-top: 2px solid var(--border-color); font-weight: 700; font-size: 15px;">
+                  <td style="padding: 16px;">(=) UTILIDAD BRUTA</td>
+                  <td id="pnl-utilidad-bruta" style="text-align: right; padding: 16px;">S/ 0.00</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px 12px 32px; color: var(--text-muted);">(-) Gastos Operativos Totales (Fletes, Publicidad, etc.)</td>
+                  <td id="pnl-gastos" style="text-align: right; padding: 12px 16px; color: var(--danger);">S/ 0.00</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 16px 12px 32px; color: var(--text-muted);">(-) Gastos Financieros y Ajustes de Caja</td>
+                  <td id="pnl-financieros" style="text-align: right; padding: 12px 16px; color: var(--danger);">S/ 0.00</td>
+                </tr>
+                <tr style="border-top: 2px solid var(--text-main); font-weight: 700; font-size: 18px; background: rgba(16, 185, 129, 0.05);">
+                  <td style="padding: 16px;">(=) UTILIDAD NETA DEL EJERCICIO</td>
+                  <td id="pnl-utilidad-neta" style="text-align: right; padding: 16px; color: var(--success);">S/ 0.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-caja" class="view">
+          <div class="kpi-grid" style="grid-template-columns: 1fr 1fr;">
+             <div class="card" style="margin-bottom:0; border-left: 5px solid var(--success);">
+                <div class="card-header">Saldo Total en Caja (Soles)</div>
+                <div class="kpi-value text-success" id="saldo-soles-display">S/ 0.00</div>
+                <div class="kpi-sub">Efectivo, Yape, Plin y Cuentas BCP locales</div>
+             </div>
+             <div class="card" style="margin-bottom:0; border-left: 5px solid var(--warning);">
+                <div class="card-header">Saldo Total en Caja (Dólares)</div>
+                <div class="kpi-value text-warning" id="saldo-dolares-display">$ 0.00</div>
+                <div class="kpi-sub">Reserva para importaciones y fletes</div>
+             </div>
+          </div>
+
+          <div class="card" style="margin-top:24px; background: rgba(245, 158, 11, 0.05); border: 1px dashed var(--warning);">
+            <div class="card-header" style="color: var(--warning); margin-bottom: 8px;">Operaciones de Cambio e Importación</div>
+            <div style="display: flex; gap: 16px;">
+              <button class="btn btn-warning" onclick="abrirModal('modal-comprar-dolares')">💱 Comprar Dólares</button>
+              <button class="btn btn-primary" onclick="abrirModal('modal-pagar-importacion')">🚢 Pagar Importación / Flete</button>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:24px;">
+            <div class="card-header">Libro Mayor Bimoneda - Movimientos Recientes</div>
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="sincronizarSupabase()">⬇️ Sincronizar Ventas POS</button>
+              <button class="btn btn-success" onclick="abrirModalManual('ingreso')">+ Ingreso Manual</button>
+              <button class="btn btn-danger" onclick="abrirModalManual('egreso')">- Egreso Manual</button>
+              <button class="btn" style="background:var(--text-main); color:var(--bg-color);" onclick="abrirModalAjusteCaja()">⚖️ Ajuste de Saldo (Arqueo)</button>
+            </div>
+            <table>
+              <thead>
+                <tr><th>Fecha</th><th>Concepto / Proveedor</th><th>Categoría</th><th>Moneda</th><th>Ingreso</th><th>Egreso</th><th>Saldos Finales</th></tr>
+              </thead>
+              <tbody id="tabla-movimientos"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-inventario" class="view">
+          <div class="kpi-grid" style="grid-template-columns: 1fr 1fr;">
+             <div class="card" style="margin-bottom:0">
+               <div class="card-header">Total de Productos en Stock</div>
+               <div class="kpi-value" id="inv-total-items">0 unidades</div>
+             </div>
+             <div class="card" style="margin-bottom:0">
+               <div class="card-header">Capital Valorizado (Inversión)</div>
+               <div class="kpi-value text-info" id="inv-total-valor">S/ 0.00</div>
+             </div>
+          </div>
+          
+          <div class="card" style="margin-top:24px;">
+             <div class="card-header">Catálogo Central de Trionex</div>
+             <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+                <input type="text" class="form-control" placeholder="🔍 Buscar producto..." style="max-width: 300px;">
+                <button class="btn btn-primary" onclick="sincronizarSupabase()">🔄 Sincronizar Stock POS</button>
+             </div>
+             <table>
+               <thead><tr><th>Producto</th><th>Categoría</th><th>Stock Físico</th><th>Costo Unit.</th><th>Precio Venta</th><th>Capital Inmovilizado</th><th>Acción</th></tr></thead>
+               <tbody id="tabla-inventario"></tbody>
+             </table>
+          </div>
+        </div>
+
+        <div id="view-analisis" class="view">
+          <div class="card" style="background: rgba(16, 185, 129, 0.05); border: 1px dashed var(--success);">
+            <div class="card-header" style="color: var(--success);">Configuración Financiera - Costos Fijos</div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Ingresa tus costos operativos mensuales (Alquiler, sueldos, internet). Esto recalculará automáticamente tu punto de equilibrio.</p>
+            <div class="form-grid" style="grid-template-columns: 1fr 2fr;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Costos Fijos Totales (S/)</label>
+                <input type="number" id="input-costos-fijos" class="form-control" value="2400" onchange="actualizarCostosFijos()">
+              </div>
+              <div style="display:flex; align-items:flex-end;">
+                <button class="btn btn-success" onclick="actualizarCostosFijos()">Guardar Costos Fijos</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">Matriz de Rotación vs Margen (Estrella vs Hueso)</div>
+            <div style="height: 300px; width: 100%;">
+              <canvas id="scatterChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-logistica" class="view">
+          <div class="card">
+            <div class="card-header">Seguimiento de Embarques Internacionales</div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:24px;">Monitorea los tiempos de llegada de tu mercadería. <b>¡Ahora sincronizado con la nube!</b></p>
+            <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+              <button class="btn btn-primary" onclick="abrirModalEmbarque()">+ Nuevo Embarque</button>
+            </div>
+            <table>
+              <thead><tr><th>Lote / Ref</th><th>Contenido</th><th>Estado Actual</th><th>Origen</th><th>ETA (Llegada)</th><th>Acciones</th></tr></thead>
+              <tbody id="tabla-logistica"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-bancos" class="view">
+          <div class="card" style="margin-bottom: 24px; background: rgba(29, 78, 216, 0.03); border: 1px dashed var(--accent-color);">
+            <div class="card-header" style="color: var(--accent-color);">+ Registrar Nuevo Financiamiento / Préstamo</div>
+            <div class="form-grid">
+              <div class="form-group"><label>Entidad Financiera</label><input type="text" id="banco-entidad" class="form-control" placeholder="Ej: BCP, Interbank"></div>
+              <div class="form-group"><label>Monto del Préstamo (S/)</label><input type="number" id="banco-monto" class="form-control" placeholder="0.00"></div>
+              <div class="form-group"><label>Número de Cuotas (Meses)</label><input type="number" id="banco-plazo" class="form-control" placeholder="Ej: 12"></div>
+              <div class="form-group"><label>Valor de la Cuota (S/)</label><input type="number" id="banco-cuota" class="form-control" placeholder="0.00"></div>
+            </div>
+            <button class="btn btn-primary" onclick="guardarPrestamo()">💾 Guardar Préstamo en Supabase</button>
+          </div>
+          <div class="card">
+            <div class="card-header">Cuadro de Préstamos Activos</div>
+            <table>
+              <thead><tr><th>Entidad Financiera</th><th>Monto Original</th><th>Plazo Restante</th><th>Cuota Mensual</th><th>Total a Pagar (Capital + Int.)</th><th>Acción</th></tr></thead>
+              <tbody id="tabla-bancos"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="view-socios" class="view">
+           <div class="card">
+            <div class="card-header">Patrimonio y Distribución</div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:24px;">Configuración de propiedad de la empresa Trionex Import.</p>
+            <div style="display:flex; gap:16px;">
+              <div style="flex:1; padding:24px; border:1px solid var(--accent-color); border-radius:12px; text-align:center; background: rgba(29, 78, 216, 0.05);">
+                <div style="font-size:40px; margin-bottom:12px;">👨‍💻</div>
+                <div style="font-weight:700; font-size:20px; color:var(--text-main);">Cristhian</div>
+                <div style="font-size:14px; color:var(--accent-color); font-weight:600; margin-top:8px;">100% Propietario Único</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:8px;">Control total sobre capital y utilidades netas.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="view-supabase" class="view">
+           <div class="card">
+            <div class="card-header">CONEXIÓN A BASE DE DATOS (SUPABASE)</div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:24px;">Conecta este panel administrativo con tu aplicación de ventas (Trionex POS) para extraer la información en tiempo real.</p>
+            <div class="form-group">
+              <label>PROJECT URL</label>
+              <input type="text" id="sb-url" class="form-control" placeholder="https://xxxxx.supabase.co">
+            </div>
+            <div class="form-group">
+              <label>API KEY (PUBLIC/ANON)</label>
+              <input type="text" id="sb-key" class="form-control" placeholder="eyJhbGci...">
+            </div>
+            <div style="display:flex; gap:16px; margin-top:24px;">
+              <button class="btn btn-primary" onclick="guardarSupabase()">💾 Guardar Credenciales</button>
+              <button class="btn btn-secondary" onclick="probarSupabase()">🔌 Probar Conexión y Sincronizar</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="modal-comprar-dolares">
+    <div class="modal-content">
+      <div class="modal-title">💱 Comprar Dólares</div>
+      <div class="form-group"><label>Monto a comprar en Dólares (USD)</label><input type="number" id="compra-usd-monto" class="form-control" oninput="calcularCompraDolares()"></div>
+      <div class="form-group"><label>Tipo de Cambio (TC)</label><input type="number" id="compra-usd-tc" class="form-control" value="3.75" step="0.001" oninput="calcularCompraDolares()"></div>
+      <div class="form-group"><label>Total en Soles a descontar (S/)</label><input type="number" id="compra-usd-total-soles" class="form-control" disabled style="font-weight:bold; color:var(--danger)"></div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-comprar-dolares')">Cancelar</button><button class="btn btn-warning" style="flex:1" onclick="procesarCompraDolares()">Confirmar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-pagar-importacion">
+    <div class="modal-content">
+      <div class="modal-title">🚢 Pago de Importación o Flete</div>
+      <div class="form-group"><label>Concepto</label><select id="pago-imp-concepto" class="form-control"><option value="Pago Mercadería">Pago Mercadería</option><option value="Pago Flete Internacional">Flete Internacional</option></select></div>
+      <div class="form-group"><label>Monto a pagar (USD)</label><input type="number" id="pago-imp-monto" class="form-control"></div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-pagar-importacion')">Cancelar</button><button class="btn btn-primary" style="flex:1" onclick="procesarPagoImportacion()">Confirmar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-manual">
+    <div class="modal-content">
+      <div class="modal-title" id="manual-title">Movimiento Manual</div>
+      <input type="hidden" id="manual-tipo">
+      <div class="form-group"><label>Concepto</label><input type="text" id="manual-concepto" class="form-control"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Moneda</label><select id="manual-moneda" class="form-control"><option value="PEN">Soles (S/)</option><option value="USD">Dólares ($)</option></select></div>
+        <div class="form-group"><label>Monto</label><input type="number" id="manual-monto" class="form-control"></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-manual')">Cancelar</button><button class="btn btn-primary" style="flex:1" onclick="guardarMovimientoManual()">Guardar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-ajuste-caja">
+    <div class="modal-content">
+      <div class="modal-title">⚖️ Arqueo de Caja Físico</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Saldo Real en Soles (S/)</label><input type="number" id="ajuste-caja-soles" class="form-control" step="0.01"></div>
+        <div class="form-group"><label>Saldo Real en Dólares ($)</label><input type="number" id="ajuste-caja-dolares" class="form-control" step="0.01"></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-ajuste-caja')">Cancelar</button><button class="btn" style="flex:1; background:var(--text-main); color:var(--bg-color);" onclick="guardarAjusteCaja()">Actualizar Saldos</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-embarque">
+    <div class="modal-content">
+      <div class="modal-title" id="embarque-modal-title">🚢 Registrar Embarque</div>
+      <input type="hidden" id="emb-id">
+      <div class="form-group"><label>Lote / Ref</label><input type="text" id="emb-ref" class="form-control"></div>
+      <div class="form-group"><label>Contenido</label><input type="text" id="emb-cont" class="form-control"></div>
+      <div class="form-group"><label>Origen</label><input type="text" id="emb-origen" class="form-control"></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Estado</label><select id="emb-estado" class="form-control"><option value="En Tránsito">✈️ En Tránsito</option><option value="En Aduanas">🛃 En Aduanas</option><option value="Retrasado">⚠️ Retrasado</option><option value="Recibido">✅ Recibido</option></select></div>
+        <div class="form-group"><label>ETA</label><input type="date" id="emb-eta" class="form-control"></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-embarque')">Cancelar</button><button class="btn btn-primary" style="flex:1" onclick="guardarEmbarque()">Guardar</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-editar-inventario">
+    <div class="modal-content">
+      <div class="modal-title">✏️ Ajuste de Inventario Físico</div>
+      <input type="hidden" id="edit-inv-id">
+      <div class="form-group"><label>Producto</label><input type="text" id="edit-inv-nombre" class="form-control" disabled></div>
+      <div class="form-grid">
+        <div class="form-group"><label>Stock Físico Actual</label><input type="number" id="edit-inv-stock" class="form-control"></div>
+        <div class="form-group"><label>Costo Unitario (S/)</label><input type="number" id="edit-inv-costo" class="form-control" step="0.01"></div>
+      </div>
+      <div class="form-group"><label>Precio de Venta (S/)</label><input type="number" id="edit-inv-precio" class="form-control" step="0.01"></div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-editar-inventario')">Cancelar</button><button class="btn btn-primary" style="flex:1" onclick="guardarEdicionInventario()">Actualizar Datos</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-cambiar-pass">
+    <div class="modal-content">
+      <div class="modal-title">🔐 Cambiar Contraseña Maestra</div>
+      <div class="form-group"><label>Contraseña Actual</label><input type="password" id="pass-actual" class="form-control"></div>
+      <div class="form-group"><label>Nueva Contraseña</label><input type="password" id="pass-nueva" class="form-control"></div>
+      <div style="display:flex; gap:8px; margin-top:24px;"><button class="btn btn-secondary" style="flex:1" onclick="cerrarModal('modal-cambiar-pass')">Cancelar</button><button class="btn btn-primary" style="flex:1" onclick="guardarNuevaPass()">Actualizar Clave</button></div>
+    </div>
+  </div>
+
+  <script>
+    // --- ESTADO BÁSICO DE SUPABASE ---
+    let db = { ventas: [], gastos: [], inventario: [], compras: [], pedidos: [] };
+    let sbConfig = { url: '', key: '' };
+
+    // --- VARIABLES LOCALES DEL ADMIN ---
+    let cajaSoles = 0.00;
+    let cajaDolares = 0.00;
+    let costosFijosMensuales = parseFloat(localStorage.getItem('trionexAdmin_CostosFijos')) || 2400.00; 
+    let movimientosCaja = JSON.parse(localStorage.getItem('trionexAdmin_Caja')) || [];
+    let prestamos = [];
+    let embarques = [];
+
+    // --- LÓGICA DE SEGURIDAD (LOGIN PERSONALIZADO) ---
+    let PASS_MAESTRA = localStorage.getItem('trionexAdmin_Pass') || "admin123";
+
+    function verificarLogin() {
+      if (document.getElementById('admin-pass').value === PASS_MAESTRA) {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('app-container').style.display = 'flex';
+        cargarFotoPerfil();
+        cargarSupabase();
+        sincronizarSupabase(); // Intenta sincronizar automáticamente al entrar
+      } else {
+        document.getElementById('login-error').style.display = 'block';
+      }
+    }
+
+    function guardarNuevaPass() {
+      const actual = document.getElementById('pass-actual').value;
+      const nueva = document.getElementById('pass-nueva').value;
+      if(actual !== PASS_MAESTRA) return alert("La contraseña actual es incorrecta.");
+      if(nueva.length < 4) return alert("La nueva contraseña debe tener al menos 4 caracteres.");
+      
+      PASS_MAESTRA = nueva;
+      localStorage.setItem('trionexAdmin_Pass', PASS_MAESTRA);
+      alert("✅ Contraseña actualizada con éxito.");
+      cerrarModal('modal-cambiar-pass');
+    }
+
+    function cerrarSesion() {
+      document.getElementById('app-container').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('admin-pass').value = '';
+      document.getElementById('profile-menu').classList.remove('open');
+    }
+    document.getElementById('admin-pass').addEventListener('keypress', function (e) { if (e.key === 'Enter') verificarLogin(); });
+
+    // --- CONEXIÓN SUPABASE Y SINCRONIZACIÓN ---
+    function cargarSupabase() {
+      sbConfig.url = localStorage.getItem('trionexAdmin_SB_URL') || '';
+      sbConfig.key = localStorage.getItem('trionexAdmin_SB_KEY') || '';
+      document.getElementById('sb-url').value = sbConfig.url;
+      document.getElementById('sb-key').value = sbConfig.key;
+    }
+
+    function guardarSupabase() {
+      sbConfig.url = document.getElementById('sb-url').value.trim();
+      sbConfig.key = document.getElementById('sb-key').value.trim();
+      localStorage.setItem('trionexAdmin_SB_URL', sbConfig.url);
+      localStorage.setItem('trionexAdmin_SB_KEY', sbConfig.key);
+      alert('✅ Credenciales de Supabase guardadas.');
+    }
+
+    async function probarSupabase() {
+      guardarSupabase();
+      await sincronizarSupabase(true);
+    }
+
+    async function sincronizarSupabase(mostrarAlerta = false) {
+      if (!sbConfig.url || !sbConfig.key) {
+        if(mostrarAlerta) alert("⚠️ Falta configurar la URL y Key de Supabase.");
+        return;
+      }
+      
+      const tables = ['ventas', 'gastos', 'inventario', 'logistica', 'bancos'];
+      
+      try {
+        for (const table of tables) {
+          const res = await fetch(`${sbConfig.url}/rest/v1/${table}?select=data`, {
+            headers: { 'apikey': sbConfig.key, 'Authorization': `Bearer ${sbConfig.key}` }
+          });
+          
+          if (res.ok) {
+            const rows = await res.json();
+            const parsedData = rows.map(r => typeof r.data === 'string' ? JSON.parse(r.data) : r.data);
+            
+            // Asignar a la variable correspondiente
+            if (table === 'logistica') embarques = parsedData;
+            else if (table === 'bancos') prestamos = parsedData;
+            else db[table] = parsedData;
+          }
+        }
+        
+        actualizarDashboard();
+        renderInventarioAdmin();
+        renderLogistica();
+        renderBancos();
+        generarPnL();
+        
+        if(mostrarAlerta) alert("✅ Ecosistema sincronizado con éxito desde la Nube.");
+        
+      } catch (error) {
+        console.error("Error conectando a Supabase:", error);
+        if(mostrarAlerta) alert("❌ Error al sincronizar. Revisa tu conexión o asegúrate de haber creado las tablas 'logistica' y 'bancos' en Supabase.");
+      }
+    }
+
+    // Funciones genéricas para inyectar/borrar data en Supabase
+    async function insertSupabase(table, data) {
+      if (!sbConfig.url || !sbConfig.key) return;
+      try {
+        const payload = { id: data.id, data: JSON.stringify(data) };
+        await fetch(`${sbConfig.url}/rest/v1/${table}`, {
+          method: 'POST',
+          headers: { 'apikey': sbConfig.key, 'Authorization': `Bearer ${sbConfig.key}`, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+          body: JSON.stringify([payload])
+        });
+      } catch(e) { console.error(e); }
+    }
+
+    async function deleteSupabase(table, id) {
+      if (!sbConfig.url || !sbConfig.key) return;
+      try {
+        await fetch(`${sbConfig.url}/rest/v1/${table}?id=eq.${id}`, {
+          method: 'DELETE',
+          headers: { 'apikey': sbConfig.key, 'Authorization': `Bearer ${sbConfig.key}` }
+        });
+      } catch(e) { console.error(e); }
+    }
+
+    // --- DASHBOARD MATEMÁTICAS ---
+    function actualizarDashboard() {
+      const now = new Date();
+      const mesActual = now.getMonth();
+      const anioActual = now.getFullYear();
+
+      const ventasMes = db.ventas.filter(v => {
+        const d = new Date(v.fecha); return d.getMonth() === mesActual && d.getFullYear() === anioActual && v.estado !== 'Cancelada';
+      });
+      
+      const gastosMes = db.gastos.filter(g => {
+        const d = new Date(g.fecha); return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+      });
+
+      const totalVentas = ventasMes.reduce((sum, v) => sum + (v.total || 0), 0);
+      const utilidadBruta = ventasMes.reduce((sum, v) => sum + (v.ganancia || 0), 0);
+      const totalGastos = gastosMes.reduce((sum, g) => sum + (g.monto || 0), 0);
+      const utilidadNeta = utilidadBruta - totalGastos;
+      const margenBruto = totalVentas > 0 ? ((utilidadBruta / totalVentas) * 100).toFixed(1) : 0;
+
+      document.getElementById('dash-ventas').textContent = `S/ ${fmt(totalVentas)}`;
+      document.getElementById('dash-bruta').textContent = `S/ ${fmt(utilidadBruta)}`;
+      document.getElementById('dash-margen').textContent = `Margen: ${margenBruto}%`;
+      document.getElementById('dash-neta').textContent = `S/ ${fmt(utilidadNeta)}`;
+      
+      // Equilibrio
+      const eqStatus = document.getElementById('eq-status');
+      if(utilidadBruta >= costosFijosMensuales) {
+        eqStatus.textContent = "Superado ✅";
+        eqStatus.className = "kpi-value text-success";
+      } else {
+        eqStatus.textContent = `Faltan S/ ${fmt(costosFijosMensuales - utilidadBruta)}`;
+        eqStatus.className = "kpi-value text-danger";
+      }
+      
+      // Actualizar Donut Chart
+      const categorias = {};
+      gastosMes.forEach(g => { categorias[g.cat] = (categorias[g.cat] || 0) + g.monto; });
+      if(Object.keys(categorias).length > 0) {
+        pieChart.data.labels = Object.keys(categorias);
+        pieChart.data.datasets[0].data = Object.values(categorias);
+        pieChart.update();
+      }
+    }
+
+    // --- NUEVO: ESTADO DE RESULTADOS (P&L) ---
+    function generarPnL() {
+      const now = new Date();
+      const mesActual = now.getMonth();
+      const anioActual = now.getFullYear();
+
+      const ventasMes = db.ventas.filter(v => {
+        const d = new Date(v.fecha); return d.getMonth() === mesActual && d.getFullYear() === anioActual && v.estado !== 'Cancelada';
+      });
+      const gastosMes = db.gastos.filter(g => {
+        const d = new Date(g.fecha); return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+      });
+
+      const totalVentas = ventasMes.reduce((sum, v) => sum + (v.total || 0), 0);
+      const totalCMV = ventasMes.reduce((sum, v) => sum + (v.costo || 0), 0);
+      const utilidadBruta = totalVentas - totalCMV;
+
+      // Separar gastos
+      let gastosOperativos = 0;
+      let gastosFinancieros = 0;
+      
+      gastosMes.forEach(g => {
+        if(g.cat === 'Finanzas' || g.cat === 'Ajuste Manual') gastosFinancieros += g.monto;
+        else gastosOperativos += g.monto;
+      });
+
+      const utilidadNeta = utilidadBruta - gastosOperativos - gastosFinancieros;
+
+      document.getElementById('pnl-ventas').textContent = `S/ ${fmt(totalVentas)}`;
+      document.getElementById('pnl-cmv').textContent = `S/ ${fmt(totalCMV)}`;
+      document.getElementById('pnl-utilidad-bruta').textContent = `S/ ${fmt(utilidadBruta)}`;
+      document.getElementById('pnl-gastos').textContent = `S/ ${fmt(gastosOperativos)}`;
+      document.getElementById('pnl-financieros').textContent = `S/ ${fmt(gastosFinancieros)}`;
+      document.getElementById('pnl-utilidad-neta').textContent = `S/ ${fmt(utilidadNeta)}`;
+    }
+
+
+    // --- INVENTARIO LÓGICA ---
+    function renderInventarioAdmin() {
+      const tbody = document.getElementById('tabla-inventario');
+      let totalItems = 0; let totalValor = 0;
+
+      // Si db.inventario está vacío (no hay supabase), usar data falsa, sino la real
+      const invData = db.inventario.length > 0 ? db.inventario : [
+         { id: 1, nombre: 'Aún no sincronizado', cat: '-', stock: 0, costo: 0, precio: 0 }
+      ];
+
+      tbody.innerHTML = invData.map(p => {
+        const stockNum = p.stock || 0;
+        const costoNum = p.costo || 0;
+        totalItems += stockNum;
+        const valorizado = stockNum * costoNum;
+        totalValor += valorizado;
+        
+        let badgeClass = stockNum > 5 ? 'badge-green' : (stockNum > 0 ? 'badge-yellow' : 'badge-red');
+        
+        return `
+          <tr>
+            <td style="font-weight:600;">${p.nombre}</td><td>${p.cat}</td>
+            <td><span class="badge ${badgeClass}">${stockNum} unds</span></td>
+            <td>S/ ${fmt(costoNum)}</td><td>S/ ${fmt(p.precio)}</td>
+            <td style="font-weight:600; color:var(--text-muted);">S/ ${fmt(valorizado)}</td>
+            <td><button class="btn btn-secondary" style="padding: 4px 8px; font-size:11px;" onclick="abrirModalEditarInventario(${p.id})">✏️ Editar</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('inv-total-items').textContent = `${totalItems} unidades`;
+      document.getElementById('inv-total-valor').textContent = `S/ ${fmt(totalValor)}`;
+    }
+
+    function abrirModalEditarInventario(id) {
+      const p = db.inventario.find(x => x.id === id);
+      if(!p) return alert("Sincroniza primero.");
+      document.getElementById('edit-inv-id').value = p.id;
+      document.getElementById('edit-inv-nombre').value = p.nombre;
+      document.getElementById('edit-inv-stock').value = p.stock;
+      document.getElementById('edit-inv-costo').value = p.costo;
+      document.getElementById('edit-inv-precio').value = p.precio;
+      abrirModal('modal-editar-inventario');
+    }
+
+    function guardarEdicionInventario() {
+      const id = parseInt(document.getElementById('edit-inv-id').value);
+      const stock = parseInt(document.getElementById('edit-inv-stock').value) || 0;
+      const costo = parseFloat(document.getElementById('edit-inv-costo').value) || 0;
+      const precio = parseFloat(document.getElementById('edit-inv-precio').value) || 0;
+
+      const p = db.inventario.find(x => x.id === id);
+      if(p) {
+        p.stock = stock; p.costo = costo; p.precio = precio;
+        insertSupabase('inventario', p); // Guarda en nube
+      }
+      
+      renderInventarioAdmin();
+      cerrarModal('modal-editar-inventario');
+    }
+
+    // --- CAJA: ARQUEO Y AJUSTE MANUAL LÓGICA ---
+    function actualizarUIBimoneda() {
+      localStorage.setItem('trionexAdmin_Caja', JSON.stringify(movimientosCaja));
+      
+      // Recalcular saldos desde cero para evitar errores
+      let sol = 0; let dol = 0;
+      // Los movimientos están ordenados del más reciente al más antiguo, así que para calcular
+      // deberíamos sumar desde el inicio de los tiempos, pero para simplificar, 
+      // confiaremos en el sSoles de la primera posición si existe.
+      if(movimientosCaja.length > 0) {
+        sol = movimientosCaja[0].sSoles; dol = movimientosCaja[0].sDolares;
+      }
+      cajaSoles = sol; cajaDolares = dol;
+
+      document.getElementById('saldo-soles-display').textContent = `S/ ${fmt(cajaSoles)}`;
+      document.getElementById('saldo-dolares-display').textContent = `$ ${fmt(cajaDolares)}`;
+      
+      const tbody = document.getElementById('tabla-movimientos');
+      tbody.innerHTML = movimientosCaja.map(m => {
+        const isSoles = m.moneda === 'PEN';
+        const colorIngreso = m.tipo === 'ingreso' ? 'text-success' : '';
+        const colorEgreso = m.tipo === 'egreso' ? 'text-danger' : '';
+        const simbolo = isSoles ? 'S/' : '$';
+        let catClass = 'badge-blue'; if(m.cat === 'Finanzas') catClass = 'badge-yellow'; if(m.cat === 'Ajuste Manual') catClass = 'badge-red';
+
+        return `<tr><td>${m.fecha}</td><td style="font-weight:500;">${m.concepto}</td><td><span class="badge ${catClass}">${m.cat}</span></td><td>${isSoles ? 'Soles (S/)' : 'Dólares ($)'}</td><td class="${colorIngreso}">${m.tipo === 'ingreso' ? simbolo + ' ' + fmt(m.monto) : '-'}</td><td class="${colorEgreso}">${m.tipo === 'egreso' ? simbolo + ' ' + fmt(m.monto) : '-'}</td><td style="font-size:12px; color:var(--text-muted)">S/ ${fmt(m.sSoles)}<br><span style="color:var(--warning)">$ ${fmt(m.sDolares)}</span></td></tr>`;
+      }).join('');
+    }
+
+    function abrirModalAjusteCaja() {
+      document.getElementById('ajuste-caja-soles').value = cajaSoles.toFixed(2);
+      document.getElementById('ajuste-caja-dolares').value = cajaDolares.toFixed(2);
+      abrirModal('modal-ajuste-caja');
+    }
+
+    function guardarAjusteCaja() {
+      const nuevoSoles = parseFloat(document.getElementById('ajuste-caja-soles').value) || 0;
+      const nuevoDolares = parseFloat(document.getElementById('ajuste-caja-dolares').value) || 0;
+      const fechaHoy = new Date().toLocaleDateString('es-PE');
+      const difSoles = nuevoSoles - cajaSoles; const difDolares = nuevoDolares - cajaDolares;
+
+      if(difSoles !== 0) movimientosCaja.unshift({ fecha: fechaHoy, concepto: 'Arqueo Físico', cat: 'Ajuste Manual', moneda: 'PEN', tipo: difSoles > 0 ? 'ingreso' : 'egreso', monto: Math.abs(difSoles), sSoles: nuevoSoles, sDolares: nuevoDolares === 0 ? cajaDolares : nuevoDolares });
+      if(difDolares !== 0) movimientosCaja.unshift({ fecha: fechaHoy, concepto: 'Arqueo Físico', cat: 'Ajuste Manual', moneda: 'USD', tipo: difDolares > 0 ? 'ingreso' : 'egreso', monto: Math.abs(difDolares), sSoles: nuevoSoles, sDolares: nuevoDolares });
+      
+      actualizarUIBimoneda(); cerrarModal('modal-ajuste-caja');
+    }
+
+    function abrirModalManual(tipo) {
+      document.getElementById('manual-tipo').value = tipo;
+      document.getElementById('manual-title').innerText = tipo === 'ingreso' ? '💰 Registrar Ingreso Manual' : '📉 Registrar Egreso Manual';
+      document.getElementById('manual-concepto').value = ''; document.getElementById('manual-monto').value = '';
+      abrirModal('modal-manual');
+    }
+
+    function guardarMovimientoManual() {
+      const tipo = document.getElementById('manual-tipo').value; 
+      const concepto = document.getElementById('manual-concepto').value || 'Movimiento Manual';
+      const moneda = document.getElementById('manual-moneda').value; 
+      const monto = parseFloat(document.getElementById('manual-monto').value) || 0;
+
+      if(monto <= 0) return alert("Ingresa un monto válido.");
+      if(moneda === 'PEN') {
+        if(tipo === 'egreso' && monto > cajaSoles) return alert("Soles insuficientes.");
+        cajaSoles = tipo === 'ingreso' ? cajaSoles + monto : cajaSoles - monto;
+      } else {
+        if(tipo === 'egreso' && monto > cajaDolares) return alert("Dólares insuficientes.");
+        cajaDolares = tipo === 'ingreso' ? cajaDolares + monto : cajaDolares - monto;
+      }
+
+      movimientosCaja.unshift({ fecha: new Date().toLocaleDateString('es-PE'), concepto, cat: 'Ajuste Manual', moneda, tipo, monto, sSoles: cajaSoles, sDolares: cajaDolares });
+      actualizarUIBimoneda(); cerrarModal('modal-manual');
+    }
+
+    function calcularCompraDolares() {
+      const usd = parseFloat(document.getElementById('compra-usd-monto').value) || 0;
+      const tc = parseFloat(document.getElementById('compra-usd-tc').value) || 0;
+      document.getElementById('compra-usd-total-soles').value = (usd * tc).toFixed(2);
+    }
+
+    function procesarCompraDolares() {
+      const usd = parseFloat(document.getElementById('compra-usd-monto').value) || 0;
+      const tc = parseFloat(document.getElementById('compra-usd-tc').value) || 0;
+      const solesTotales = usd * tc;
+      if(usd <= 0 || tc <= 0) return alert("Valores inválidos.");
+      if(solesTotales > cajaSoles) return alert("Soles insuficientes.");
+      cajaSoles -= solesTotales; cajaDolares += usd;
+      const hoy = new Date().toLocaleDateString('es-PE');
+      movimientosCaja.unshift({ fecha: hoy, concepto: `Compra Dólares (TC: ${tc})`, cat: 'Finanzas', moneda: 'PEN', tipo: 'egreso', monto: solesTotales, sSoles: cajaSoles, sDolares: cajaDolares });
+      movimientosCaja.unshift({ fecha: hoy, concepto: `Ingreso Dólares comprados`, cat: 'Finanzas', moneda: 'USD', tipo: 'ingreso', monto: usd, sSoles: cajaSoles, sDolares: cajaDolares });
+      actualizarUIBimoneda(); cerrarModal('modal-comprar-dolares');
+    }
+
+    function procesarPagoImportacion() {
+      const concepto = document.getElementById('pago-imp-concepto').value;
+      const usd = parseFloat(document.getElementById('pago-imp-monto').value) || 0;
+      if(usd <= 0) return alert("Monto válido requerido.");
+      if(usd > cajaDolares) return alert("Dólares insuficientes.");
+      cajaDolares -= usd;
+      movimientosCaja.unshift({ fecha: new Date().toLocaleDateString('es-PE'), concepto, cat: 'Logística', moneda: 'USD', tipo: 'egreso', monto: usd, sSoles: cajaSoles, sDolares: cajaDolares });
+      actualizarUIBimoneda(); cerrarModal('modal-pagar-importacion');
+    }
+
+
+    // --- COSTOS FIJOS ---
+    function actualizarCostosFijos() {
+      const valor = parseFloat(document.getElementById('input-costos-fijos').value);
+      if(valor >= 0) {
+        costosFijosMensuales = valor;
+        localStorage.setItem('trionexAdmin_CostosFijos', costosFijosMensuales);
+        alert(`Costos fijos actualizados a S/ ${fmt(costosFijosMensuales)}.`);
+        actualizarDashboard(); // Recalcula punto equilibrio
+      }
+    }
+    document.getElementById('input-costos-fijos').value = costosFijosMensuales;
+
+
+    // --- LOGÍSTICA ---
+    function renderLogistica() {
+      const tbody = document.getElementById('tabla-logistica');
+      tbody.innerHTML = embarques.map(e => {
+        let badgeClass = 'badge-blue';
+        if(e.estado.includes('Aduanas')) badgeClass = 'badge-warning';
+        if(e.estado.includes('Retrasado')) badgeClass = 'badge-red';
+        if(e.estado.includes('Recibido')) badgeClass = 'badge-green';
+        
+        return `<tr><td style="font-weight:bold;">${e.ref}</td><td>${e.cont}</td><td><span class="badge ${badgeClass}">${e.estado}</span></td><td>${e.origen}</td><td class="${e.estado.includes('Retrasado') ? 'text-danger' : ''}">${e.eta}</td><td><button class="btn btn-secondary" style="padding: 4px 8px; font-size:11px;" onclick="editarEmbarque(${e.id})">✏️ Editar</button><button class="btn btn-danger" style="padding: 4px 8px; font-size:11px;" onclick="eliminarEmbarque(${e.id})">🗑️</button></td></tr>`;
+      }).join('');
+    }
+
+    function abrirModalEmbarque() {
+      document.getElementById('emb-id').value = ''; document.getElementById('emb-ref').value = '';
+      document.getElementById('emb-cont').value = ''; document.getElementById('emb-origen').value = '';
+      document.getElementById('emb-estado').value = 'En Tránsito'; document.getElementById('emb-eta').value = '';
+      document.getElementById('embarque-modal-title').innerText = '🚢 Registrar Embarque';
+      abrirModal('modal-embarque');
+    }
+    function editarEmbarque(id) {
+      const e = embarques.find(x => x.id === id); if(!e) return;
+      document.getElementById('emb-id').value = e.id; document.getElementById('emb-ref').value = e.ref;
+      document.getElementById('emb-cont').value = e.cont; document.getElementById('emb-origen').value = e.origen;
+      document.getElementById('emb-estado').value = e.estado; document.getElementById('emb-eta').value = e.eta;
+      document.getElementById('embarque-modal-title').innerText = '✏️ Editar Embarque';
+      abrirModal('modal-embarque');
+    }
+    function guardarEmbarque() {
+      const id = document.getElementById('emb-id').value;
+      const ref = document.getElementById('emb-ref').value; const cont = document.getElementById('emb-cont').value;
+      const origen = document.getElementById('emb-origen').value; const estado = document.getElementById('emb-estado').value;
+      const eta = document.getElementById('emb-eta').value;
+      if(!ref) return alert("Ingresa la referencia.");
+      
+      let nuevoEmbarque = { id: id ? parseInt(id) : Date.now(), ref, cont, origen, estado, eta };
+      
+      if(id) {
+        const index = embarques.findIndex(x => x.id == id);
+        if(index !== -1) embarques[index] = nuevoEmbarque;
+      } else {
+        embarques.unshift(nuevoEmbarque);
+      }
+      
+      insertSupabase('logistica', nuevoEmbarque); // Nube
+      renderLogistica(); cerrarModal('modal-embarque');
+    }
+    function eliminarEmbarque(id) {
+      if(confirm("¿Eliminar este embarque?")) { 
+        embarques = embarques.filter(x => x.id !== id); 
+        deleteSupabase('logistica', id); // Nube
+        renderLogistica(); 
+      }
+    }
+
+
+    // --- BANCOS Y PRÉSTAMOS ---
+    function renderBancos() {
+      const tbody = document.getElementById('tabla-bancos');
+      tbody.innerHTML = prestamos.map(p => {
+        const totalPagar = p.plazo * p.cuota;
+        return `<tr><td style="font-weight:bold;">${p.entidad}</td><td>S/ ${fmt(p.monto)}</td><td>${p.plazo} meses</td><td>S/ ${fmt(p.cuota)}</td><td class="text-warning" style="font-weight:bold;">S/ ${fmt(totalPagar)}</td><td><button class="btn btn-danger" style="padding: 4px 8px; font-size:11px;" onclick="eliminarPrestamo(${p.id})">🗑️ Saldar</button></td></tr>`;
+      }).join('');
+    }
+    function guardarPrestamo() {
+      const entidad = document.getElementById('banco-entidad').value;
+      const monto = parseFloat(document.getElementById('banco-monto').value) || 0;
+      const plazo = parseInt(document.getElementById('banco-plazo').value) || 0;
+      const cuota = parseFloat(document.getElementById('banco-cuota').value) || 0;
+      if(!entidad || monto <= 0 || plazo <= 0 || cuota <= 0) return alert('Completa todos los campos con números válidos.');
+      
+      const nuevoPrestamo = { id: Date.now(), entidad, monto, plazo, cuota };
+      prestamos.unshift(nuevoPrestamo);
+      insertSupabase('bancos', nuevoPrestamo); // Nube
+      
+      renderBancos();
+      document.getElementById('banco-entidad').value = ''; document.getElementById('banco-monto').value = '';
+      document.getElementById('banco-plazo').value = ''; document.getElementById('banco-cuota').value = '';
+      alert('Préstamo guardado en Supabase.');
+    }
+    function eliminarPrestamo(id) {
+      if(confirm('¿Seguro de saldar/eliminar este préstamo?')) { 
+        prestamos = prestamos.filter(p => p.id !== id); 
+        deleteSupabase('bancos', id); // Nube
+        renderBancos(); 
+      }
+    }
+
+
+    // --- EXPORTAR EXCEL ---
+    function exportarExcel() {
+      if (typeof XLSX === 'undefined') return alert("Librería Excel no cargada.");
+      const wb = XLSX.utils.book_new();
+      
+      const dataCaja = movimientosCaja.map(m => ({ 'Fecha': m.fecha, 'Concepto': m.concepto, 'Categoría': m.cat, 'Moneda': m.moneda, 'Tipo': m.tipo, 'Monto': m.monto, 'Saldo Soles': m.sSoles, 'Saldo Dólares': m.sDolares }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataCaja), 'Libro Mayor Caja');
+
+      const dataInv = db.inventario.map(p => ({ 'Producto': p.nombre, 'Categoría': p.cat, 'Stock': p.stock, 'Costo (S/)': p.costo, 'Precio (S/)': p.precio, 'Capital (S/)': p.stock * p.costo }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataInv), 'Inventario Físico');
+
+      const dataLog = embarques.map(e => ({ 'Lote/Ref': e.ref, 'Contenido': e.cont, 'Origen': e.origen, 'Estado': e.estado, 'ETA': e.eta }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataLog), 'Embarques Logística');
+      
+      const fechaHoy = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(wb, `Trionex_Admin_Reporte_${fechaHoy}.xlsx`);
+    }
+
+    // --- INICIALIZACIÓN ---
+    document.addEventListener('DOMContentLoaded', () => {
+      actualizarUIBimoneda();
+      renderLogistica(); 
+      renderBancos();
+    });
+
+    function abrirModal(id) { document.getElementById(id).classList.add('active'); }
+    function cerrarModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    // FOTO PERFIL
+    function toggleProfileMenu() { document.getElementById('profile-menu').classList.toggle('open'); }
+    function uploadCompanyPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        localStorage.setItem('trionexAdminLogo', e.target.result); 
+        aplicarFotoPerfil(e.target.result);
+        document.getElementById('profile-menu').classList.remove('open');
+      }; reader.readAsDataURL(file);
+    }
+    function cargarFotoPerfil() {
+      const savedLogo = localStorage.getItem('trionexAdminLogo');
+      if (savedLogo) aplicarFotoPerfil(savedLogo);
+    }
+    function aplicarFotoPerfil(imgSrc) { document.getElementById('user-avatar-display').innerHTML = `<img src="${imgSrc}" alt="Logo">`; }
+
+    // TEMA Y NAVEGACIÓN
+    function switchView(viewId, element) {
+      document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('view-' + viewId).classList.add('active');
+      element.classList.add('active');
+      document.getElementById('topbar-title').innerText = element.innerText.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF] /g, '');
+    }
+    function toggleTheme() {
+      const body = document.body; const btn = document.getElementById('btn-theme');
+      if (body.classList.contains('dark-mode')) {
+        body.classList.remove('dark-mode'); btn.innerHTML = '🌙 Modo Noche';
+        Chart.defaults.color = '#6b7280'; Chart.defaults.borderColor = '#e5e7eb';
+      } else {
+        body.classList.add('dark-mode'); btn.innerHTML = '☀️ Modo Claro';
+        Chart.defaults.color = '#8b949e'; Chart.defaults.borderColor = '#30363d';
+      }
+      mainChart.update(); pieChart.update(); scatterChart.update();
+    }
+    function fmt(num) { return Number(num).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+    // GRÁFICOS (CHART.JS)
+    const ctxMain = document.getElementById('mainChart').getContext('2d');
+    const mainChart = new Chart(ctxMain, {
+      type: 'line', data: { labels: ['Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr'], datasets: [{ label: 'Ventas (Ingresos)', data: [5000, 8000, 6500, 11000, 12500, 14250], borderColor: '#1d4ed8', tension: 0.4, borderWidth: 3 }, { label: 'Gastos', data: [3500, 6000, 4000, 7500, 8000, 8450], borderColor: '#ef4444', tension: 0.4, borderWidth: 2 }] },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+    const ctxPie = document.getElementById('pieChart').getContext('2d');
+    const pieChart = new Chart(ctxPie, {
+      type: 'doughnut', data: { labels: ['Costo Mercadería', 'Flete', 'Marketing', 'Intereses BCP'], datasets: [{ data: [60, 20, 10, 10], backgroundColor: ['#1d4ed8', '#3b82f6', '#93c5fd', '#ef4444'], borderWidth: 0 }] },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
+    });
+    const ctxScatter = document.getElementById('scatterChart').getContext('2d');
+    const scatterChart = new Chart(ctxScatter, {
+      type: 'scatter', data: { datasets: [{ label: 'Perfumes y Equipos', data: [{x: 80, y: 45}, {x: 60, y: 50}, {x: 10, y: 30}, {x: 90, y: 20}], backgroundColor: '#4ade80', pointRadius: 8 }] },
+      options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Rotación (Velocidad de venta)' }, min: 0, max: 100 }, y: { title: { display: true, text: 'Margen de Ganancia (%)' }, min: 0, max: 60 } }, plugins: { legend: { display: false } } }
+    });
+  </script>
+</body>
+</html>
