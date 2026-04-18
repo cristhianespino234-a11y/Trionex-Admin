@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trionex Admin - Sistema Central v9</title>
+<title>Trionex Admin - Sistema Central v9.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -222,7 +222,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
             <div class="card" style="margin-bottom:0">
               <div class="card-header">Salud / Punto Equilibrio</div>
               <div class="kpi-value text-success" id="eq-status">Analizando...</div>
-              <div class="kpi-sub" id="eq-sub">Cubiertos fijos de S/ 2,400</div>
+              <div class="kpi-sub" id="eq-sub">Análisis en tiempo real</div>
             </div>
           </div>
 
@@ -341,18 +341,33 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
         <div id="view-analisis" class="view">
           <div class="card" style="background: rgba(16, 185, 129, 0.05); border: 1px dashed var(--success);">
-            <div class="card-header" style="color: var(--success);">Configuración Financiera - Costos Fijos</div>
-            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Ingresa tus costos operativos mensuales (Alquiler, sueldos, internet). Esto recalculará automáticamente tu punto de equilibrio.</p>
-            <div class="form-grid" style="grid-template-columns: 1fr 2fr;">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label>Costos Fijos Totales (S/)</label>
-                <input type="number" id="input-costos-fijos" class="form-control" value="2400" onchange="actualizarCostosFijos()">
-              </div>
-              <div style="display:flex; align-items:flex-end;">
-                <button class="btn btn-success" onclick="actualizarCostosFijos()">Guardar Costos Fijos</button>
-              </div>
+            <div class="card-header" style="color: var(--success); display: flex; justify-content: space-between; align-items: center;">
+              <span>Configuración Financiera - Costos Fijos Detallados</span>
+              <span class="badge badge-green" style="font-size: 14px; padding: 6px 12px;">Total OPEX: S/ <span id="total-cf-dashboard">0.00</span></span>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Ingresa tus costos operativos mensuales desglosados (Alquiler, sueldos, internet). Esto recalculará automáticamente tu punto de equilibrio y rentabilidad.</p>
+            
+            <form id="form-cf" onsubmit="agregarCostoFijo(event)" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; margin-bottom: 20px;">
+              <input type="text" id="desc-cf" class="form-control" placeholder="Descripción (Ej. Alquiler Almacén, Internet Módulo)" required autocomplete="off">
+              <input type="number" id="monto-cf" class="form-control" placeholder="Monto (S/)" step="0.01" min="0" required>
+              <button type="submit" class="btn btn-success">➕ Añadir Costo</button>
+            </form>
+
+            <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+              <table style="margin: 0;">
+                <thead style="background: rgba(0,0,0,0.02);">
+                  <tr>
+                    <th>Concepto Operativo</th>
+                    <th>Monto Mensual (PEN)</th>
+                    <th style="text-align: center;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="lista-cf">
+                  </tbody>
+              </table>
             </div>
           </div>
+          
           <div class="card">
             <div class="card-header">Matriz de Rotación vs Margen (Estrella vs Hueso)</div>
             <div style="height: 300px; width: 100%;">
@@ -521,7 +536,22 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
     let cajaSoles = 0.00;
     let cajaDolares = 0.00;
-    let costosFijosMensuales = parseFloat(localStorage.getItem('trionexAdmin_CostosFijos')) || 2400.00; 
+    
+    // --- ESTADO COSTOS FIJOS (NUEVO) ---
+    let costosFijosMensuales = 0; // Se calcula automáticamente
+    let arregloCostosFijos = [];
+
+    // Lógica de migración inicial por si el usuario ya tenía guardado el valor general antiguo
+    function inicializarCostosFijos() {
+        const savedArr = localStorage.getItem('trionexAdmin_ArregloCF');
+        if (savedArr) {
+            arregloCostosFijos = JSON.parse(savedArr);
+        } else {
+            // Si no hay arreglo, intentamos rescatar el valor antiguo único
+            const oldFijo = parseFloat(localStorage.getItem('trionexAdmin_CostosFijos')) || 2400.00;
+            arregloCostosFijos = [{ id: Date.now(), descripcion: "Costos Operativos Base", monto: oldFijo }];
+        }
+    }
 
     // --- LÓGICA DE SEGURIDAD ---
     let PASS_MAESTRA = localStorage.getItem('trionexAdmin_Pass') || "admin123";
@@ -532,7 +562,9 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         document.getElementById('app-container').style.display = 'flex';
         cargarFotoPerfil();
         cargarSupabase();
-        iniciarAutoSync(); // Inicia el motor en tiempo real
+        inicializarCostosFijos();
+        renderCostosFijos(); // Renderiza la tabla y calcula el total al entrar
+        iniciarAutoSync(); 
       } else {
         document.getElementById('login-error').style.display = 'block';
       }
@@ -562,9 +594,8 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
     // --- 🟢 MOTOR REAL-TIME AUTO-SYNC 🟢 ---
     function iniciarAutoSync() {
-      sincronizarSupabase(false); // Sincroniza al entrar
+      sincronizarSupabase(false);
       if(syncInterval) clearInterval(syncInterval);
-      // Cada 10 segundos busca cambios en silencio
       syncInterval = setInterval(() => { sincronizarSupabase(false); }, 10000); 
     }
 
@@ -596,7 +627,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
     async function probarSupabase() {
       guardarSupabase();
-      await sincronizarSupabase(true); // True = muestra alertas si hay error/éxito
+      await sincronizarSupabase(true);
     }
 
     async function sincronizarSupabase(mostrarAlerta = false) {
@@ -620,7 +651,6 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
           }
         }
         
-        // Actualizar variables y vistas con los nuevos datos
         calcularCajaDesdeNube();
         actualizarDashboard();
         renderInventarioAdmin();
@@ -628,7 +658,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         renderBancos();
         generarPnL();
         
-        mostrarIndicadorSync(); // Prende la luz verde en la barra superior
+        mostrarIndicadorSync(); 
         if(mostrarAlerta) alert("✅ Ecosistema sincronizado en tiempo real.");
         
       } catch (error) {
@@ -662,7 +692,6 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
     // --- CAJA: LÓGICA EN LA NUBE ---
     function calcularCajaDesdeNube() {
-      // Ordenar de más nuevo a más viejo
       db.caja.sort((a,b) => b.id - a.id);
       
       let cSoles = 0; let cDolares = 0;
@@ -727,7 +756,6 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
       if(difSoles !== 0) agregarMovimientoCaja('Arqueo Físico', 'Ajuste Manual', 'PEN', difSoles > 0 ? 'ingreso' : 'egreso', Math.abs(difSoles));
       
-      // Pequeño delay para que no choquen los IDs si se hacen dos ajustes al mismo tiempo
       if(difDolares !== 0) {
         setTimeout(() => {
           agregarMovimientoCaja('Arqueo Físico', 'Ajuste Manual', 'USD', difDolares > 0 ? 'ingreso' : 'egreso', Math.abs(difDolares));
@@ -813,8 +841,10 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
       document.getElementById('dash-margen').textContent = `Margen: ${margenBruto}%`;
       document.getElementById('dash-neta').textContent = `S/ ${fmt(utilidadNeta)}`;
       
-      // Equilibrio
+      // Equilibrio dinámico consumiendo los costos desglosados
       const eqStatus = document.getElementById('eq-status');
+      const eqSub = document.getElementById('eq-sub');
+      
       if(utilidadBruta >= costosFijosMensuales) {
         eqStatus.textContent = "Superado ✅";
         eqStatus.className = "kpi-value text-success";
@@ -822,6 +852,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         eqStatus.textContent = `Faltan S/ ${fmt(costosFijosMensuales - utilidadBruta)}`;
         eqStatus.className = "kpi-value text-danger";
       }
+      eqSub.textContent = `Cubiertos OPEX de S/ ${fmt(costosFijosMensuales)}`;
       
       // Actualizar Donut Chart
       const categorias = {};
@@ -909,7 +940,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
       const p = db.inventario.find(x => x.id === id);
       if(p) {
         p.stock = stock; p.costo = costo; p.precio = precio;
-        insertSupabase('inventario', p); // Guarda en nube
+        insertSupabase('inventario', p);
       }
       
       renderInventarioAdmin();
@@ -917,17 +948,53 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
     }
 
 
-    // --- COSTOS FIJOS ---
-    function actualizarCostosFijos() {
-      const valor = parseFloat(document.getElementById('input-costos-fijos').value);
-      if(valor >= 0) {
-        costosFijosMensuales = valor;
-        localStorage.setItem('trionexAdmin_CostosFijos', costosFijosMensuales);
-        alert(`Costos fijos actualizados a S/ ${fmt(costosFijosMensuales)}.`);
+    // --- COSTOS FIJOS (NUEVA LÓGICA ABC) ---
+    function renderCostosFijos() {
+        const tbody = document.getElementById('lista-cf');
+        tbody.innerHTML = '';
+        let sumaTotal = 0;
+
+        arregloCostosFijos.forEach((costo) => {
+            sumaTotal += costo.monto;
+            tbody.innerHTML += `
+                <tr>
+                    <td style="font-weight: 500;">${costo.descripcion}</td>
+                    <td class="text-success" style="font-weight: bold;">S/ ${fmt(costo.monto)}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-danger" style="padding: 4px 8px; font-size:11px;" onclick="eliminarCostoFijo(${costo.id})">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // Actualizar variables y Dashboard
+        costosFijosMensuales = sumaTotal;
+        document.getElementById('total-cf-dashboard').textContent = fmt(sumaTotal);
+        
+        // Persistir localmente por ahora (hasta integrar con tabla configuracion de Supabase)
+        localStorage.setItem('trionexAdmin_ArregloCF', JSON.stringify(arregloCostosFijos));
         actualizarDashboard(); 
-      }
     }
-    document.getElementById('input-costos-fijos').value = costosFijosMensuales;
+
+    function agregarCostoFijo(e) {
+        e.preventDefault();
+        const desc = document.getElementById('desc-cf').value.trim();
+        const monto = parseFloat(document.getElementById('monto-cf').value) || 0;
+
+        if (desc && monto > 0) {
+            arregloCostosFijos.push({ id: Date.now(), descripcion: desc, monto: monto });
+            document.getElementById('form-cf').reset();
+            document.getElementById('desc-cf').focus();
+            renderCostosFijos();
+        }
+    }
+
+    function eliminarCostoFijo(id) {
+        if(confirm("¿Eliminar este rubro de tus costos fijos?")) {
+            arregloCostosFijos = arregloCostosFijos.filter(c => c.id !== id);
+            renderCostosFijos();
+        }
+    }
 
 
     // --- LOGÍSTICA ---
