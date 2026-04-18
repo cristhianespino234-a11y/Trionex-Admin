@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trionex Admin - Sistema Central v9.1</title>
+<title>Trionex Admin - Sistema Central v9.2 (Cloud Sync)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -345,7 +345,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
               <span>Configuración Financiera - Costos Fijos Detallados</span>
               <span class="badge badge-green" style="font-size: 14px; padding: 6px 12px;">Total OPEX: S/ <span id="total-cf-dashboard">0.00</span></span>
             </div>
-            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Ingresa tus costos operativos mensuales desglosados (Alquiler, sueldos, internet). Esto recalculará automáticamente tu punto de equilibrio y rentabilidad.</p>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:16px;">Ingresa tus costos operativos mensuales desglosados (Alquiler, sueldos, internet). Esto recalculará automáticamente tu punto de equilibrio y rentabilidad. Se sincroniza con Supabase en tiempo real.</p>
             
             <form id="form-cf" onsubmit="agregarCostoFijo(event)" style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; margin-bottom: 20px;">
               <input type="text" id="desc-cf" class="form-control" placeholder="Descripción (Ej. Alquiler Almacén, Internet Módulo)" required autocomplete="off">
@@ -530,28 +530,17 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
   <script>
     // --- ESTADO BÁSICO DE SUPABASE Y CAJA ---
-    let db = { ventas: [], gastos: [], inventario: [], compras: [], logistica: [], bancos: [], caja: [] };
+    // Se añadió 'configuracion' al arreglo de tablas globales
+    let db = { ventas: [], gastos: [], inventario: [], compras: [], logistica: [], bancos: [], caja: [], configuracion: [] };
     let sbConfig = { url: '', key: '' };
     let syncInterval = null;
 
     let cajaSoles = 0.00;
     let cajaDolares = 0.00;
     
-    // --- ESTADO COSTOS FIJOS (NUEVO) ---
-    let costosFijosMensuales = 0; // Se calcula automáticamente
+    // --- ESTADO COSTOS FIJOS ---
+    let costosFijosMensuales = 0; 
     let arregloCostosFijos = [];
-
-    // Lógica de migración inicial por si el usuario ya tenía guardado el valor general antiguo
-    function inicializarCostosFijos() {
-        const savedArr = localStorage.getItem('trionexAdmin_ArregloCF');
-        if (savedArr) {
-            arregloCostosFijos = JSON.parse(savedArr);
-        } else {
-            // Si no hay arreglo, intentamos rescatar el valor antiguo único
-            const oldFijo = parseFloat(localStorage.getItem('trionexAdmin_CostosFijos')) || 2400.00;
-            arregloCostosFijos = [{ id: Date.now(), descripcion: "Costos Operativos Base", monto: oldFijo }];
-        }
-    }
 
     // --- LÓGICA DE SEGURIDAD ---
     let PASS_MAESTRA = localStorage.getItem('trionexAdmin_Pass') || "admin123";
@@ -562,9 +551,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         document.getElementById('app-container').style.display = 'flex';
         cargarFotoPerfil();
         cargarSupabase();
-        inicializarCostosFijos();
-        renderCostosFijos(); // Renderiza la tabla y calcula el total al entrar
-        iniciarAutoSync(); 
+        iniciarAutoSync(); // El Auto-Sync ahora llamará automáticamente a cargarCostosFijosDesdeNube
       } else {
         document.getElementById('login-error').style.display = 'block';
       }
@@ -636,7 +623,8 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         return;
       }
       
-      const tables = ['ventas', 'gastos', 'inventario', 'logistica', 'bancos', 'caja'];
+      // Agregamos 'configuracion' a la lista de tablas a consultar
+      const tables = ['ventas', 'gastos', 'inventario', 'logistica', 'bancos', 'caja', 'configuracion'];
       
       try {
         for (const table of tables) {
@@ -657,6 +645,7 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         renderLogistica();
         renderBancos();
         generarPnL();
+        cargarCostosFijosDesdeNube(); // <-- NUEVA FUNCIÓN AÑADIDA PARA SYNC
         
         mostrarIndicadorSync(); 
         if(mostrarAlerta) alert("✅ Ecosistema sincronizado en tiempo real.");
@@ -948,7 +937,23 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
     }
 
 
-    // --- COSTOS FIJOS (NUEVA LÓGICA ABC) ---
+    // --- COSTOS FIJOS (CONECTADO A SUPABASE) ---
+    
+    // Función que lee la nube y actualiza el arreglo local
+    function cargarCostosFijosDesdeNube() {
+        // Buscamos el documento maestro de configuración (usaremos id: 1)
+        const configDocs = db.configuracion.find(c => c.id === 1);
+        
+        if (configDocs && configDocs.arregloCF) {
+            arregloCostosFijos = configDocs.arregloCF;
+        } else {
+            // Si la tabla está vacía, intentamos rescatar lo que había en LocalStorage
+            const savedArr = localStorage.getItem('trionexAdmin_ArregloCF');
+            arregloCostosFijos = savedArr ? JSON.parse(savedArr) : [];
+        }
+        renderCostosFijos();
+    }
+
     function renderCostosFijos() {
         const tbody = document.getElementById('lista-cf');
         tbody.innerHTML = '';
@@ -970,9 +975,6 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
         // Actualizar variables y Dashboard
         costosFijosMensuales = sumaTotal;
         document.getElementById('total-cf-dashboard').textContent = fmt(sumaTotal);
-        
-        // Persistir localmente por ahora (hasta integrar con tabla configuracion de Supabase)
-        localStorage.setItem('trionexAdmin_ArregloCF', JSON.stringify(arregloCostosFijos));
         actualizarDashboard(); 
     }
 
@@ -983,6 +985,11 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
 
         if (desc && monto > 0) {
             arregloCostosFijos.push({ id: Date.now(), descripcion: desc, monto: monto });
+            
+            // Guardamos el arreglo completo en Supabase bajo el ID 1
+            const payload = { id: 1, arregloCF: arregloCostosFijos };
+            insertSupabase('configuracion', payload);
+
             document.getElementById('form-cf').reset();
             document.getElementById('desc-cf').focus();
             renderCostosFijos();
@@ -990,8 +997,13 @@ body.dark-mode tr:hover td { background-color: rgba(255,255,255,0.02); }
     }
 
     function eliminarCostoFijo(id) {
-        if(confirm("¿Eliminar este rubro de tus costos fijos?")) {
+        if(confirm("¿Eliminar este rubro de tus costos fijos? Esto recalculará tu Punto de Equilibrio.")) {
             arregloCostosFijos = arregloCostosFijos.filter(c => c.id !== id);
+            
+            // Actualizamos Supabase con el elemento removido
+            const payload = { id: 1, arregloCF: arregloCostosFijos };
+            insertSupabase('configuracion', payload);
+            
             renderCostosFijos();
         }
     }
